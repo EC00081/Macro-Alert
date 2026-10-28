@@ -10,5 +10,25 @@
   "FED_RESERVES": {
     "value": 2962607.0,
     "date": "2026-10-21"
+  },
+  "DISCOUNT_WINDOW": {
+    "value": 8935.0,
+    "date": "2026-10-21"
+  },
+  "CPI_INFLATION": {
+    "value": 336.298,
+    "date": "2026-09-01"
+  },
+  "FED_FUNDS": {
+    "value": 3.75,
+    "date": "2026-09-01"
+  },
+  "MORTGAGE_30Y": {
+    "value": 7.32,
+    "date": "2026-10-22"
+  },
+  "CRUDE_OIL_WTI": {
+    "value": 103.37,
+    "date": "2026-10-27"
   }
 }
