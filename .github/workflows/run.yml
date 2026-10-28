@@ -2,10 +2,9 @@ name: Macro Plumbing Pipeline
 
 on:
   schedule:
-    # Runs Monday-Friday at 8:15 AM ET (13:15 UTC) and 1:30 PM ET (18:30 UTC)
     - cron: '15 13 * * 1-5'
     - cron: '30 18 * * 1-5'
-  workflow_dispatch: # Allows you to manually click "Run" anytime to test!
+  workflow_dispatch:
 
 jobs:
   track:
