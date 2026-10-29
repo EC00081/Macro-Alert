@@ -8,104 +8,71 @@ import requests
 PUSHOVER_USER_KEY = os.environ.get("PUSHOVER_USER_KEY")
 PUSHOVER_API_TOKEN = os.environ.get("PUSHOVER_API_TOKEN")
 FRED_API_KEY = os.environ.get("FRED_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 LEDGER_FILE = "ledger.json"
 
-# Complete registry of all your screenshot indicators
 METRIC_REGISTRY = {
-    # 1. Monetary Plumbing & Interbank Stress
     "ON_RRP": {
         "fred_id": "RRPONTSYD",
         "name": "Overnight Reverse Repo (ON RRP)",
         "type": "pct",
         "threshold": 5.0,
-        "unit": "Billion",
-        "meaning_up": "Institutions parked more cash at the Fed, choosing safe zero-risk yield over lending in the private market.",
-        "meaning_down": "Institutions pulled cash out of the Fed parking spot and injected it back into Treasuries and short-term markets.",
-        "impact": "Tracks remaining excess cash in the financial system. When this hits zero, cash becomes scarce."
+        "unit": "Billion"
     },
     "SOFR": {
         "fred_id": "SOFR",
         "name": "Secured Overnight Financing Rate (SOFR)",
         "type": "bps",
-        "threshold": 0.05, # 5 bps
-        "unit": "%",
-        "meaning_up": "The overnight rate to borrow cash against Treasury collateral jumped.",
-        "meaning_down": "The cost to borrow cash overnight against Treasury collateral decreased.",
-        "impact": "The bedrock interest rate for the financial system. Spikes signal cash friction between banks."
+        "threshold": 0.05,
+        "unit": "%"
     },
-
-    # 2. Fed Balance Sheet & Bank Stress (H.4.1 Release)
     "FED_RESERVES": {
         "fred_id": "WRESBAL",
         "name": "Bank Reserve Balances at the Fed",
         "type": "pct",
         "threshold": 3.0,
-        "unit": "Billion",
-        "meaning_up": "Commercial bank reserves deposited at the Fed increased.",
-        "meaning_down": "Commercial bank reserves at the Fed fell, shrinking the bank cash cushion.",
-        "impact": "Shows whether the banking system holds 'abundant reserves' or if quantitative tightening is biting."
+        "unit": "Billion"
     },
     "DISCOUNT_WINDOW": {
         "fred_id": "WPC",
         "name": "Fed Discount Window Borrowings (Emergency Cash)",
         "type": "diff",
-        "threshold": 2000.0, # Spike > $2 Billion (Units in millions)
-        "unit": "Million",
-        "meaning_up": "Banks tapped the Fed's emergency loan window for cash they couldn't get elsewhere.",
-        "meaning_down": "Emergency borrowing from the Fed subsided back toward normal levels.",
-        "impact": "A sudden spike is the primary early warning sign of distress at a commercial bank."
+        "threshold": 2000.0,
+        "unit": "Million"
     },
-
-    # 3. Macro Inflation & Central Bank Policy
     "CPI_INFLATION": {
         "fred_id": "CPIAUCSL",
         "name": "Consumer Price Index (Headline CPI)",
         "type": "pct",
-        "threshold": 0.2, # 0.2% monthly move is significant
-        "unit": "Index",
-        "meaning_up": "Consumer basket prices accelerated faster than the prior month.",
-        "meaning_down": "Consumer price growth cooled off compared to the prior month.",
-        "impact": "Directly dictates whether the Fed has room to cut rates or must keep policy restrictive."
+        "threshold": 0.2,
+        "unit": "Index"
     },
     "FED_FUNDS": {
         "fred_id": "FEDFUNDS",
         "name": "Effective Federal Funds Rate (FOMC Target)",
         "type": "bps",
         "threshold": 0.15,
-        "unit": "%",
-        "meaning_up": "The Fed hiked benchmark interest rates, tightening borrowing conditions.",
-        "meaning_down": "The Fed cut benchmark rates, easing financial conditions across the economy.",
-        "impact": "The ultimate steering wheel for yields, loans, mortgages, and private equity financing."
+        "unit": "%"
     },
-
-    # 4. Real Estate & Mortgage Debt
     "MORTGAGE_30Y": {
         "fred_id": "MORTGAGE30US",
         "name": "30-Year Fixed Mortgage Average",
         "type": "bps",
-        "threshold": 0.10, # 10 bps
-        "unit": "%",
-        "meaning_up": "Home borrowing rates rose, making monthly mortgage payments more expensive.",
-        "meaning_down": "Home borrowing rates dipped, slightly improving affordability for buyers.",
-        "impact": "Drives housing market transaction volume, inventory lock-in, and coastal property pricing."
+        "threshold": 0.10,
+        "unit": "%"
     },
-
-    # 5. Energy Commodities
     "CRUDE_OIL_WTI": {
         "fred_id": "DCOILWTICO",
         "name": "WTI Crude Oil Spot Price",
         "type": "pct",
         "threshold": 5.0,
-        "unit": "$/barrel",
-        "meaning_up": "Crude oil prices surged by over 5%, pushing fuel input costs higher.",
-        "meaning_down": "Crude oil tumbled over 5%, easing direct fuel and transport cost pressure.",
-        "impact": "The primary upstream input cost for the supply chain and consumer headline inflation."
+        "unit": "$/barrel"
     }
 }
 
 # -----------------------------
-# Core Pipeline Functions
+# Pipeline Helpers
 # -----------------------------
 def load_ledger():
     if os.path.exists(LEDGER_FILE):
@@ -138,6 +105,47 @@ def fetch_latest_fred_value(series_id):
         print(f"Error fetching {series_id}: {e}")
     return None, None
 
+def ask_gemini_translator(metric_name, old_val, new_val, diff, pct_change, unit):
+    """
+    Hands off raw numbers to Gemini to write concise plain-English market briefs.
+    """
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    
+    prompt = f"""
+You are a plain-English macro financial analyst for an investor.
+Translate this official data move into simple, everyday language without corporate jargon:
+
+Indicator: {metric_name}
+Previous Reading: {old_val} {unit}
+New Reading: {new_val} {unit}
+Absolute Change: {diff:+.2f} {unit}
+Percentage Change: {pct_change:+.2f}%
+
+Format your response strictly as follows (no asterisks, keep it short and punchy for a mobile screen):
+The Move: [1 concise sentence stating the change in numbers and direction]
+What It Means: [1-2 sentences explaining what physically happened to the money/market in simple layman terms]
+Why It Matters: [1-2 sentences on what this practically signals for interest rates, banks, or the broader market]
+"""
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        res_data = response.json()
+        generated_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return generated_text
+    except Exception as e:
+        print(f"Gemini API fallback error: {e}")
+        # Fallback if the API fails or rate-limits
+        return (
+            f"The Move: {metric_name} shifted by {pct_change:+.2f}% ({diff:+.2f} {unit}) to {new_val} {unit}.\n\n"
+            f"What It Means: Significant change detected crossing your threshold.\n\n"
+            f"Why It Matters: Review official report for market impact."
+        )
+
 def send_push_notification(title, message):
     url = "https://api.pushover.net/1/messages.json"
     payload = {
@@ -151,24 +159,6 @@ def send_push_notification(title, message):
         requests.post(url, data=payload, timeout=10)
     except Exception as e:
         print(f"Failed to dispatch Pushover alert: {e}")
-
-def format_alert(meta, old_val, new_val, diff, pct_change):
-    direction = "surged" if diff > 0 else "dropped"
-    meaning = meta["meaning_up"] if diff > 0 else meta["meaning_down"]
-    
-    if meta["type"] == "bps":
-        bps_move = abs(diff * 100)
-        move_str = f"shifted by {bps_move:.1f} bps ({diff:+.2f}%) to {new_val:.2f}{meta['unit']}"
-    elif meta["type"] == "diff":
-        move_str = f"{direction} by {abs(diff):,.1f} {meta['unit']} to {new_val:,.1f} {meta['unit']}"
-    else:
-        move_str = f"{direction} by {abs(pct_change):.2f}% ({diff:+.2f} {meta['unit']}) to {new_val} {meta['unit']}"
-
-    return (
-        f"📊 The Move: {meta['name']} {move_str}.\n\n"
-        f"💡 What It Means: {meaning}\n\n"
-        f"🎯 Why It Matters: {meta['impact']}"
-    )
 
 def main():
     ledger = load_ledger()
@@ -188,7 +178,7 @@ def main():
             print(f"Logged initial baseline for {key}: {val} on {date_str}")
             continue
 
-        # If data hasn't refreshed on FRED yet, nothing new to report
+        # If FRED hasn't updated the date yet, skip
         if prev_entry.get("date") == date_str:
             continue
 
@@ -196,7 +186,7 @@ def main():
         diff = val - old_val
         pct_change = (diff / old_val) * 100 if old_val != 0 else 0
 
-        # Threshold checking
+        # Check thresholds
         trigger = False
         if meta["type"] == "pct" and abs(pct_change) >= meta["threshold"]:
             trigger = True
@@ -207,11 +197,11 @@ def main():
 
         if trigger:
             title = f"🚨 MACRO ALERT: {meta['name']}"
-            msg = format_alert(meta, old_val, val, diff, pct_change)
-            send_push_notification(title, msg)
+            print(f"Threshold triggered for {key}! Asking Gemini to summarize...")
+            plain_english_body = ask_gemini_translator(meta["name"], old_val, val, diff, pct_change, meta["unit"])
+            send_push_notification(title, plain_english_body)
             print(f"Sent Pushover alert for {key}!")
 
-        # Record latest observation in ledger
         ledger[key] = {"value": val, "date": date_str}
         updated = True
 
