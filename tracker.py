@@ -3,7 +3,7 @@ import json
 import requests
 
 # -----------------------------
-# Configuration & Secrets
+# Configuration & Credentials
 # -----------------------------
 PUSHOVER_USER_KEY = os.environ.get("PUSHOVER_USER_KEY")
 PUSHOVER_API_TOKEN = os.environ.get("PUSHOVER_API_TOKEN")
@@ -11,91 +11,107 @@ FRED_API_KEY = os.environ.get("FRED_API_KEY")
 
 LEDGER_FILE = "ledger.json"
 
+# Core Monetary Plumbing & Liquidity Indicators
 METRIC_REGISTRY = {
+    # 1. Overnight Reverse Repo (ON RRP)
     "ON_RRP": {
         "fred_id": "RRPONTSYD",
-        "name": "Overnight Reverse Repo (ON RRP)",
+        "name": "Overnight Reverse Repo Facility",
         "type": "pct",
         "threshold": 5.0,
         "unit": "Billion",
-        "meaning_up": "Institutions parked more cash directly at the Fed, choosing zero-risk overnight yield over private market lending.",
-        "meaning_down": "Institutions pulled cash out of the Fed parking facility and deployed it back into Treasury bills and commercial paper.",
-        "impact": "This gauges remaining excess system liquidity. A persistent drain toward zero signals that surplus cash is evaporating and cash scarcity is approaching."
+        "meaning_up": "Cash parked at the Fed expanded. Money funds and dealers chose zero-risk central bank yield over private bills/paper.",
+        "meaning_down": "Cash drained from the Fed's facility and flowed back into market instruments (T-bills, repo, deposits).",
+        "impact": "Primary gauge of surplus system liquidity. Once drained near zero, interbank cash buffers are effectively gone."
     },
+
+    # 2. Benchmark Secured Overnight Financing Rate (SOFR)
     "SOFR": {
         "fred_id": "SOFR",
-        "name": "Secured Overnight Financing Rate (SOFR)",
+        "name": "SOFR Benchmark Rate",
         "type": "bps",
-        "threshold": 0.05, # 5 bps
+        "threshold": 0.05, # 5 basis points
         "unit": "%",
-        "meaning_up": "The overnight cost for banks and institutions to borrow cash backed by Treasuries jumped.",
-        "meaning_down": "The cost to borrow secured overnight cash eased, reflecting ample collateral funding.",
-        "impact": "The core plumbing rate for the financial system. Spikes indicate that institutions are scrambling for cash or balance sheet room."
+        "meaning_up": "Secured interbank overnight borrowing rates spiked, indicating collateral or cash friction.",
+        "meaning_down": "Cost of secured overnight lending eased across primary dealers.",
+        "impact": "The bedrock rate of the plumbing. Jumps signal cash scarcity or balance sheet strain among primary dealers."
     },
+
+    # 3. Commercial Bank Reserves at the Fed (H.4.1)
     "FED_RESERVES": {
         "fred_id": "WRESBAL",
-        "name": "Bank Reserve Balances at the Fed",
+        "name": "Commercial Bank Reserves at Fed",
         "type": "pct",
         "threshold": 3.0,
         "unit": "Billion",
-        "meaning_up": "Commercial bank cash balances deposited at the Fed increased.",
-        "meaning_down": "Commercial bank reserves dropped, shrinking the primary liquidity buffer.",
-        "impact": "Tracks whether the banking sector maintains 'abundant reserves'. Dropping reserves increase systemic vulnerability to credit shocks."
+        "meaning_up": "Total reserves deposited by banks at the central bank expanded.",
+        "meaning_down": "Bank reserve balances shrank, drawing down the system's baseline liquidity cushion.",
+        "impact": "Shows whether the banking system remains in 'abundant reserves' territory or is drifting toward stress."
     },
+
+    # 4. Emergency Discount Window (Primary Credit)
     "DISCOUNT_WINDOW": {
         "fred_id": "WPC",
-        "name": "Fed Discount Window (Emergency Borrowings)",
+        "name": "Fed Discount Window Borrowings",
         "type": "diff",
-        "threshold": 2000.0, # $2B spike
+        "threshold": 2000.0, # $2B jump (data in millions)
         "unit": "Million",
-        "meaning_up": "Commercial banks tapped the Fed's emergency lender-of-last-resort facility for liquidity they couldn't secure privately.",
-        "meaning_down": "Emergency liquidity borrowing subsided back toward baseline levels.",
-        "impact": "Sudden spikes are the primary red flag for distress or panic at a commercial bank."
+        "meaning_up": "Commercial banks tapped emergency lender-of-last-resort funds, unable to source liquidity in private markets.",
+        "meaning_down": "Emergency borrowing normalized back toward baseline levels.",
+        "impact": "The definitive early-warning signal for acute solvency or liquidity distress at depository institutions."
     },
+
+    # 5. Headline Consumer Price Index (CPI)
     "CPI_INFLATION": {
         "fred_id": "CPIAUCSL",
-        "name": "Consumer Price Index (Headline CPI)",
+        "name": "Consumer Price Index (CPI)",
         "type": "pct",
         "threshold": 0.2,
         "unit": "Index",
-        "meaning_up": "Consumer basket inflation accelerated faster than the prior monthly reading.",
-        "meaning_down": "Consumer price growth cooled compared to the prior month.",
-        "impact": "Constrains Fed policy. Hot inflation removes room to cut rates, while cooler prints support easing."
+        "meaning_up": "Monthly inflation pressure accelerated, reinforcing sticky price dynamics.",
+        "meaning_down": "Monthly consumer price inflation softened relative to the prior period.",
+        "impact": "Defines real yield dynamics. Persistent inflation below official yields is the classic mechanism of financial repression."
     },
+
+    # 6. Effective Federal Funds Rate (EFFR)
     "FED_FUNDS": {
         "fred_id": "FEDFUNDS",
         "name": "Effective Federal Funds Rate",
         "type": "bps",
         "threshold": 0.15,
         "unit": "%",
-        "meaning_up": "The Fed pushed benchmark interest rates higher, tightening overall financial conditions.",
-        "meaning_down": "The Fed cut benchmark rates, easing borrowing costs across the economy.",
-        "impact": "The ultimate steering wheel for yields, loans, mortgages, and private market debt."
+        "meaning_up": "Fed executed a policy rate increase, tightening broad monetary conditions.",
+        "meaning_down": "Fed executed a rate cut, easing policy rates across credit markets.",
+        "impact": "Anchor rate for public debt refinancing costs and private credit benchmarks."
     },
+
+    # 7. 30-Year Fixed Mortgage Average
     "MORTGAGE_30Y": {
         "fred_id": "MORTGAGE30US",
-        "name": "30-Year Fixed Mortgage Average",
+        "name": "30-Year Fixed Mortgage Rate",
         "type": "bps",
-        "threshold": 0.10,
+        "threshold": 0.10, # 10 bps
         "unit": "%",
-        "meaning_up": "Home borrowing costs increased, adding pressure to monthly payment affordability.",
-        "meaning_down": "Mortgage borrowing rates dipped, providing temporary relief for buyers and refinancers.",
-        "impact": "Directly impacts housing transaction velocity, inventory lock-in, and residential valuations."
+        "meaning_up": "Mortgage financing costs climbed, increasing debt-service friction for real estate buyers.",
+        "meaning_down": "Mortgage financing rates dipped, marginally reducing borrower cost of capital.",
+        "impact": "Dictates residential credit creation, liquidity lock-in, and housing transaction velocity."
     },
+
+    # 8. WTI Spot Crude Oil
     "CRUDE_OIL_WTI": {
         "fred_id": "DCOILWTICO",
-        "name": "WTI Crude Oil Spot Price",
+        "name": "WTI Crude Oil Spot",
         "type": "pct",
         "threshold": 5.0,
         "unit": "$/bbl",
-        "meaning_up": "Crude prices surged, driving fuel and transportation input costs higher across supply chains.",
-        "meaning_down": "Crude prices sold off, alleviating energy and manufacturing input pressures.",
-        "impact": "The primary upstream driver for headline inflation prints and central bank inflation expectations."
+        "meaning_up": "Crude oil spiked, injecting cost-push energy inflation into headline metrics.",
+        "meaning_down": "Crude prices retreated, reducing upstream transportation and manufacturing input costs.",
+        "impact": "Core input cost for industrial activity and sovereign inflation calculations."
     }
 }
 
 # -----------------------------
-# Pipeline Helpers
+# Storage & Data Retrieval
 # -----------------------------
 def load_ledger():
     if os.path.exists(LEDGER_FILE):
@@ -140,7 +156,7 @@ def send_push_notification(title, message):
     try:
         requests.post(url, data=payload, timeout=10)
     except Exception as e:
-        print(f"Failed to dispatch Pushover alert: {e}")
+        print(f"Pushover dispatch failed: {e}")
 
 def build_analyst_brief(meta, old_val, new_val, diff, pct_change):
     direction = "jumped" if diff > 0 else "dropped"
@@ -160,6 +176,9 @@ def build_analyst_brief(meta, old_val, new_val, diff, pct_change):
         f"Why It Matters: {meta['impact']}"
     )
 
+# -----------------------------
+# Execution Loop
+# -----------------------------
 def main():
     ledger = load_ledger()
     updated = False
@@ -171,12 +190,14 @@ def main():
 
         prev_entry = ledger.get(key)
 
+        # Baseline capture on initial run
         if not prev_entry:
             ledger[key] = {"value": val, "date": date_str}
             updated = True
-            print(f"Logged initial baseline for {key}: {val} on {date_str}")
+            print(f"Recorded baseline for {key}: {val} on {date_str}")
             continue
 
+        # If data date hasn't shifted, skip
         if prev_entry.get("date") == date_str:
             continue
 
@@ -184,6 +205,7 @@ def main():
         diff = val - old_val
         pct_change = (diff / old_val) * 100 if old_val != 0 else 0
 
+        # Deterministic Threshold Gate
         trigger = False
         if meta["type"] == "pct" and abs(pct_change) >= meta["threshold"]:
             trigger = True
@@ -196,8 +218,9 @@ def main():
             title = f"🚨 MACRO ALERT: {meta['name']}"
             body = build_analyst_brief(meta, old_val, val, diff, pct_change)
             send_push_notification(title, body)
-            print(f"Dispatched institutional alert for {key}!")
+            print(f"Trigger tripped for {key}! Sent notification.")
 
+        # Update ledger with latest date and figure
         ledger[key] = {"value": val, "date": date_str}
         updated = True
 
