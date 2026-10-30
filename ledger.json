@@ -30,5 +30,13 @@
   "CRUDE_OIL_WTI": {
     "value": 103.37,
     "date": "2026-10-27"
+  },
+  "FED_ASSETS_TOTAL": {
+    "value": 6745635.0,
+    "date": "2026-10-28"
+  },
+  "TGA_BALANCE": {
+    "value": 999727.0,
+    "date": "2026-10-28"
   }
 }
