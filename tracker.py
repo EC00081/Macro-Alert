@@ -11,24 +11,26 @@ FRED_API_KEY = os.environ.get("FRED_API_KEY")
 
 LEDGER_FILE = "ledger.json"
 
-# Core Monetary Plumbing & Liquidity Indicators
+# =====================================================================
+# MASTER MACRO & MONETARY PLUMBING REGISTRY
+# =====================================================================
 METRIC_REGISTRY = {
-    # 1. Overnight Reverse Repo (ON RRP)
+    # -------------------------------------------------------------
+    # 1. DAILY MONETARY PLUMBING & INTERBANK STRESS
+    # -------------------------------------------------------------
     "ON_RRP": {
         "fred_id": "RRPONTSYD",
-        "name": "Overnight Reverse Repo Facility",
+        "name": "Overnight Reverse Repo Facility (ON RRP)",
         "type": "pct",
         "threshold": 5.0,
         "unit": "Billion",
-        "meaning_up": "Cash parked at the Fed expanded. Money funds and dealers chose zero-risk central bank yield over private bills/paper.",
+        "meaning_up": "Cash parked at the Fed expanded. Institutions chose zero-risk central bank yield over private bills/paper.",
         "meaning_down": "Cash drained from the Fed's facility and flowed back into market instruments (T-bills, repo, deposits).",
-        "impact": "Primary gauge of surplus system liquidity. Once drained near zero, interbank cash buffers are effectively gone."
+        "impact": "Primary gauge of surplus system liquidity. Once drained near zero, interbank cash buffers are gone."
     },
-
-    # 2. Benchmark Secured Overnight Financing Rate (SOFR)
     "SOFR": {
         "fred_id": "SOFR",
-        "name": "SOFR Benchmark Rate",
+        "name": "Secured Overnight Financing Rate (SOFR)",
         "type": "bps",
         "threshold": 0.05, # 5 basis points
         "unit": "%",
@@ -37,76 +39,100 @@ METRIC_REGISTRY = {
         "impact": "The bedrock rate of the plumbing. Jumps signal cash scarcity or balance sheet strain among primary dealers."
     },
 
-    # 3. Commercial Bank Reserves at the Fed (H.4.1)
+    # -------------------------------------------------------------
+    # 2. WEEKLY FED H.4.1 BALANCE SHEET (Thursdays 4:30 PM ET)
+    # -------------------------------------------------------------
+    "FED_ASSETS_TOTAL": {
+        "fred_id": "WALCL",
+        "name": "Fed Total Assets (Balance Sheet / QT)",
+        "type": "pct",
+        "threshold": 1.0,
+        "unit": "Million",
+        "meaning_up": "The Federal Reserve expanded its overall balance sheet assets (bond purchases or liquidity facilities).",
+        "meaning_down": "The Fed's balance sheet contracted as bonds matured without reinvestment (Quantitative Tightening).",
+        "impact": "Shows whether the central bank is actively draining liquidity from the financial system via QT."
+    },
     "FED_RESERVES": {
         "fred_id": "WRESBAL",
-        "name": "Commercial Bank Reserves at Fed",
+        "name": "Commercial Bank Reserves at Fed (H.4.1)",
         "type": "pct",
         "threshold": 3.0,
         "unit": "Billion",
-        "meaning_up": "Total reserves deposited by banks at the central bank expanded.",
-        "meaning_down": "Bank reserve balances shrank, drawing down the system's baseline liquidity cushion.",
-        "impact": "Shows whether the banking system remains in 'abundant reserves' territory or is drifting toward stress."
+        "meaning_up": "Commercial bank cash deposits held at the Fed expanded.",
+        "meaning_down": "Bank reserve deposits shrank, reducing the core cash buffer of the commercial banking system.",
+        "impact": "Core liquidity gauge. Confirms if the banking system holds 'abundant reserves' or if stress is building."
     },
-
-    # 4. Emergency Discount Window (Primary Credit)
+    "TGA_BALANCE": {
+        "fred_id": "WTREGEN",
+        "name": "Treasury General Account (TGA) Balance",
+        "type": "pct",
+        "threshold": 5.0,
+        "unit": "Billion",
+        "meaning_up": "The U.S. Treasury's checking account filled up, locking liquidity out of the commercial banking sector.",
+        "meaning_down": "The Treasury spent money down into the economy, injecting cash directly into bank reserves.",
+        "impact": "The TGA acts like a domestic liquidity sponge. Large fills tighten market cash; drawdowns provide a liquidity tailwind."
+    },
     "DISCOUNT_WINDOW": {
         "fred_id": "WPC",
-        "name": "Fed Discount Window Borrowings",
+        "name": "Fed Discount Window Borrowings (Emergency Cash)",
         "type": "diff",
-        "threshold": 2000.0, # $2B jump (data in millions)
+        "threshold": 2000.0, # Spike > $2 Billion (data reported in millions)
         "unit": "Million",
-        "meaning_up": "Commercial banks tapped emergency lender-of-last-resort funds, unable to source liquidity in private markets.",
-        "meaning_down": "Emergency borrowing normalized back toward baseline levels.",
-        "impact": "The definitive early-warning signal for acute solvency or liquidity distress at depository institutions."
+        "meaning_up": "Commercial banks tapped the Fed's emergency lender-of-last-resort facility for loans they couldn't get privately.",
+        "meaning_down": "Emergency liquidity borrowing normalized back toward baseline levels.",
+        "impact": "Definitive early-warning indicator for acute solvency or liquidity distress at commercial banks."
     },
 
-    # 5. Headline Consumer Price Index (CPI)
+    # -------------------------------------------------------------
+    # 3. MACRO INFLATION & CENTRAL BANK POLICY
+    # -------------------------------------------------------------
     "CPI_INFLATION": {
         "fred_id": "CPIAUCSL",
-        "name": "Consumer Price Index (CPI)",
+        "name": "Consumer Price Index (Headline CPI)",
         "type": "pct",
-        "threshold": 0.2,
+        "threshold": 0.2, # 0.2% monthly shift is significant
         "unit": "Index",
-        "meaning_up": "Monthly inflation pressure accelerated, reinforcing sticky price dynamics.",
+        "meaning_up": "Monthly consumer basket prices accelerated faster than the prior monthly reading.",
         "meaning_down": "Monthly consumer price inflation softened relative to the prior period.",
         "impact": "Defines real yield dynamics. Persistent inflation below official yields is the classic mechanism of financial repression."
     },
-
-    # 6. Effective Federal Funds Rate (EFFR)
     "FED_FUNDS": {
         "fred_id": "FEDFUNDS",
-        "name": "Effective Federal Funds Rate",
+        "name": "Effective Federal Funds Rate (FOMC Target)",
         "type": "bps",
         "threshold": 0.15,
         "unit": "%",
-        "meaning_up": "Fed executed a policy rate increase, tightening broad monetary conditions.",
-        "meaning_down": "Fed executed a rate cut, easing policy rates across credit markets.",
-        "impact": "Anchor rate for public debt refinancing costs and private credit benchmarks."
+        "meaning_up": "The Fed pushed benchmark interest rates higher, tightening borrowing conditions.",
+        "meaning_down": "The Fed cut benchmark rates, easing borrowing costs across the economy.",
+        "impact": "The ultimate steering wheel for yields, loans, mortgages, and private equity financing."
     },
 
-    # 7. 30-Year Fixed Mortgage Average
+    # -------------------------------------------------------------
+    # 4. REAL ESTATE & MORTGAGE DEBT
+    # -------------------------------------------------------------
     "MORTGAGE_30Y": {
         "fred_id": "MORTGAGE30US",
-        "name": "30-Year Fixed Mortgage Rate",
+        "name": "30-Year Fixed Mortgage Average",
         "type": "bps",
         "threshold": 0.10, # 10 bps
         "unit": "%",
-        "meaning_up": "Mortgage financing costs climbed, increasing debt-service friction for real estate buyers.",
-        "meaning_down": "Mortgage financing rates dipped, marginally reducing borrower cost of capital.",
-        "impact": "Dictates residential credit creation, liquidity lock-in, and housing transaction velocity."
+        "meaning_up": "Home borrowing rates rose, making monthly debt service more expensive for buyers.",
+        "meaning_down": "Home borrowing rates dipped, slightly improving debt service affordability.",
+        "impact": "Directly impacts housing transaction velocity, inventory lock-in, and residential valuations."
     },
 
-    # 8. WTI Spot Crude Oil
+    # -------------------------------------------------------------
+    # 5. COMMODITIES & UPSTREAM INFLATION
+    # -------------------------------------------------------------
     "CRUDE_OIL_WTI": {
         "fred_id": "DCOILWTICO",
-        "name": "WTI Crude Oil Spot",
+        "name": "WTI Crude Oil Spot Price",
         "type": "pct",
         "threshold": 5.0,
-        "unit": "$/bbl",
-        "meaning_up": "Crude oil spiked, injecting cost-push energy inflation into headline metrics.",
-        "meaning_down": "Crude prices retreated, reducing upstream transportation and manufacturing input costs.",
-        "impact": "Core input cost for industrial activity and sovereign inflation calculations."
+        "unit": "$/barrel",
+        "meaning_up": "Crude oil prices surged by over 5%, pushing fuel input costs higher.",
+        "meaning_down": "Crude oil tumbled over 5%, easing energy and manufacturing cost pressures.",
+        "impact": "The primary upstream input cost for global supply chains and consumer headline inflation."
     }
 }
 
@@ -177,7 +203,7 @@ def build_analyst_brief(meta, old_val, new_val, diff, pct_change):
     )
 
 # -----------------------------
-# Execution Loop
+# Main Execution Engine
 # -----------------------------
 def main():
     ledger = load_ledger()
