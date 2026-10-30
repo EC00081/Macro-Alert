@@ -47,29 +47,40 @@
     .card-date { font-size: 0.7rem; color: var(--text-muted); }
     .card-right { text-align: right; }
     .card-val { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-    .badge-tight { background: rgba(239, 68, 68, 0.2); color: var(--red); }
-    .badge-ease { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+    .card-unit { font-size: 0.7rem; color: var(--accent); margin-top: 2px; text-transform: uppercase; }
   </style>
 </head>
 <body>
 
   <header>
     <h1>Monetary Plumbing Console</h1>
-    <div class="subtitle" id="last-updated">Updating telemetry...</div>
+    <div class="subtitle" id="last-updated">Connecting to GitHub telemetry...</div>
   </header>
 
   <div class="net-box">
     <div class="net-title">Calculated Fed Net Liquidity</div>
-    <div class="net-val" id="net-liquidity">Loading...</div>
-    <div class="net-formula">Formula: Total Assets - (Treasury General Account + ON RRP)</div>
+    <div class="net-val" id="net-liquidity">Calculating...</div>
+    <div class="net-formula">Formula: Total Assets (WALCL) − [TGA (WTREGEN) + ON RRP (RRPONTSYD)]</div>
   </div>
 
   <div class="grid" id="metrics-grid">
-    <!-- Dynamic Cards populated from ledger.json -->
+    <!-- Populated dynamically -->
   </div>
 
   <script>
+    const SPEC = {
+      "FED_ASSETS_TOTAL": { label: "Fed Total Assets (QT)", unit: "$ Millions", isAssets: true },
+      "FED_RESERVES": { label: "Commercial Bank Reserves", unit: "$ Millions" },
+      "TGA_BALANCE": { label: "Treasury Checking (TGA)", unit: "$ Billions", isTga: true },
+      "ON_RRP": { label: "Overnight Reverse Repo", unit: "$ Billions", isRrp: true },
+      "DISCOUNT_WINDOW": { label: "Emergency Discount Window", unit: "$ Millions" },
+      "SOFR": { label: "SOFR Overnight Rate", unit: "% Annualized" },
+      "FED_FUNDS": { label: "Effective Fed Funds Rate", unit: "% Annualized" },
+      "MORTGAGE_30Y": { label: "30-Year Mortgage Average", unit: "% Annualized" },
+      "CRUDE_OIL_WTI": { label: "WTI Crude Spot", unit: "$ per Barrel" },
+      "CPI_INFLATION": { label: "Headline CPI Index", unit: "Index Level" }
+    };
+
     async function initTerminal() {
       try {
         const res = await fetch('ledger.json?t=' + new Date().getTime());
@@ -78,43 +89,36 @@
         let grid = document.getElementById('metrics-grid');
         grid.innerHTML = '';
 
-        // Calculate Net Liquidity: WALCL (mil to bil) - WTREGEN (bil) - RRP (bil)
-        let assets = (data.FED_ASSETS_TOTAL?.value || 0) / 1000;
-        let tga = data.TGA_BALANCE?.value || 0;
-        let rrp = data.ON_RRP?.value || 0;
+        // Standardize Assets to Billions
+        let rawAssets = data.FED_ASSETS_TOTAL?.value || 0;
+        let assetsBillions = rawAssets > 100000 ? rawAssets / 1000 : rawAssets;
 
-        if (assets > 0) {
-          let net = assets - tga - rrp;
+        // Standardize TGA to Billions
+        let rawTga = data.TGA_BALANCE?.value || 0;
+        let tgaBillions = rawTga > 10000 ? rawTga / 1000 : rawTga;
+
+        // ON RRP is already in Billions
+        let rrpBillions = data.ON_RRP?.value || 0;
+
+        if (assetsBillions > 0) {
+          let net = assetsBillions - (tgaBillions + rrpBillions);
           document.getElementById('net-liquidity').innerText = '$' + net.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' Billion';
         }
 
-        const labels = {
-          "ON_RRP": "Overnight Reverse Repo",
-          "SOFR": "SOFR Overnight Rate",
-          "FED_ASSETS_TOTAL": "Fed Total Assets (QT)",
-          "FED_RESERVES": "Commercial Bank Reserves",
-          "TGA_BALANCE": "Treasury Checking (TGA)",
-          "DISCOUNT_WINDOW": "Emergency Discount Window",
-          "CPI_INFLATION": "Headline CPI Index",
-          "FED_FUNDS": "Effective Fed Funds",
-          "MORTGAGE_30Y": "30-Year Mortgage Avg",
-          "CRUDE_OIL_WTI": "WTI Crude Spot"
-        };
-
         for (const [key, item] of Object.entries(data)) {
-          let name = labels[key] || key;
-          let val = item.value.toLocaleString();
-          let date = item.date;
+          let meta = SPEC[key] || { label: key, unit: "" };
+          let val = Number(item.value).toLocaleString(undefined, { maximumFractionDigits: 3 });
 
           let card = document.createElement('div');
           card.className = 'card';
           card.innerHTML = `
             <div class="card-left">
-              <span class="card-title">${name}</span>
-              <span class="card-date">Report Date: ${date}</span>
+              <span class="card-title">${meta.label}</span>
+              <span class="card-date">Observation Date: ${item.date}</span>
             </div>
             <div class="card-right">
               <div class="card-val">${val}</div>
+              <div class="card-unit">${meta.unit}</div>
             </div>
           `;
           grid.appendChild(card);
