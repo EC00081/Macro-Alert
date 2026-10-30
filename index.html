@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Macro Plumbing Terminal</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131a29;
+      --border: #232f48;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    body { background-color: var(--bg); color: var(--text-main); padding: 16px; max-width: 650px; margin: 0 auto; }
+    header { padding: 16px 0 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; text-transform: uppercase; color: var(--accent); }
+    .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+    
+    .net-box {
+      background: linear-gradient(145deg, #162238, #0e1726);
+      border: 1px solid #2b3d63;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .net-title { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; }
+    .net-val { font-size: 1.8rem; font-weight: 800; color: #fff; margin: 6px 0; }
+    .net-formula { font-size: 0.75rem; color: #64748b; }
+
+    .grid { display: flex; flex-direction: column; gap: 10px; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-left { display: flex; flex-direction: column; gap: 3px; }
+    .card-title { font-size: 0.85rem; font-weight: 600; color: #e2e8f0; }
+    .card-date { font-size: 0.7rem; color: var(--text-muted); }
+    .card-right { text-align: right; }
+    .card-val { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .badge-tight { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+    .badge-ease { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Monetary Plumbing Console</h1>
+    <div class="subtitle" id="last-updated">Updating telemetry...</div>
+  </header>
+
+  <div class="net-box">
+    <div class="net-title">Calculated Fed Net Liquidity</div>
+    <div class="net-val" id="net-liquidity">Loading...</div>
+    <div class="net-formula">Formula: Total Assets - (Treasury General Account + ON RRP)</div>
+  </div>
+
+  <div class="grid" id="metrics-grid">
+    <!-- Dynamic Cards populated from ledger.json -->
+  </div>
+
+  <script>
+    async function initTerminal() {
+      try {
+        const res = await fetch('ledger.json?t=' + new Date().getTime());
+        const data = await res.json();
+        
+        let grid = document.getElementById('metrics-grid');
+        grid.innerHTML = '';
+
+        // Calculate Net Liquidity: WALCL (mil to bil) - WTREGEN (bil) - RRP (bil)
+        let assets = (data.FED_ASSETS_TOTAL?.value || 0) / 1000;
+        let tga = data.TGA_BALANCE?.value || 0;
+        let rrp = data.ON_RRP?.value || 0;
+
+        if (assets > 0) {
+          let net = assets - tga - rrp;
+          document.getElementById('net-liquidity').innerText = '$' + net.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' Billion';
+        }
+
+        const labels = {
+          "ON_RRP": "Overnight Reverse Repo",
+          "SOFR": "SOFR Overnight Rate",
+          "FED_ASSETS_TOTAL": "Fed Total Assets (QT)",
+          "FED_RESERVES": "Commercial Bank Reserves",
+          "TGA_BALANCE": "Treasury Checking (TGA)",
+          "DISCOUNT_WINDOW": "Emergency Discount Window",
+          "CPI_INFLATION": "Headline CPI Index",
+          "FED_FUNDS": "Effective Fed Funds",
+          "MORTGAGE_30Y": "30-Year Mortgage Avg",
+          "CRUDE_OIL_WTI": "WTI Crude Spot"
+        };
+
+        for (const [key, item] of Object.entries(data)) {
+          let name = labels[key] || key;
+          let val = item.value.toLocaleString();
+          let date = item.date;
+
+          let card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div class="card-left">
+              <span class="card-title">${name}</span>
+              <span class="card-date">Report Date: ${date}</span>
+            </div>
+            <div class="card-right">
+              <div class="card-val">${val}</div>
+            </div>
+          `;
+          grid.appendChild(card);
+        }
+
+        document.getElementById('last-updated').innerText = 'Synced live from GitHub telemetry';
+      } catch (e) {
+        document.getElementById('last-updated').innerText = 'Failed to load ledger.json';
+      }
+    }
+    initTerminal();
+  </script>
+</body>
+</html>
