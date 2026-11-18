@@ -1,11 +1,11 @@
 {
   "ON_RRP": {
-    "value": 0.351,
-    "date": "2026-11-17"
+    "value": 0.331,
+    "date": "2026-11-18"
   },
   "SOFR": {
-    "value": 3.93,
-    "date": "2026-11-16"
+    "value": 3.92,
+    "date": "2026-11-17"
   },
   "FED_RESERVES": {
     "value": 2960603.0,
@@ -28,8 +28,8 @@
     "date": "2026-11-12"
   },
   "CRUDE_OIL_WTI": {
-    "value": 89.62,
-    "date": "2026-11-11"
+    "value": 89.53,
+    "date": "2026-11-17"
   },
   "FED_ASSETS_TOTAL": {
     "value": 6758867.0,
