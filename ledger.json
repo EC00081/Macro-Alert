@@ -1,19 +1,19 @@
 {
   "ON_RRP": {
-    "value": 0.331,
-    "date": "2026-11-18"
+    "value": 0.405,
+    "date": "2026-11-19"
   },
   "SOFR": {
-    "value": 3.92,
-    "date": "2026-11-17"
+    "value": 3.9,
+    "date": "2026-11-18"
   },
   "FED_RESERVES": {
-    "value": 2960603.0,
-    "date": "2026-11-11"
+    "value": 2979656.0,
+    "date": "2026-11-18"
   },
   "DISCOUNT_WINDOW": {
-    "value": 8898.0,
-    "date": "2026-11-11"
+    "value": 9366.0,
+    "date": "2026-11-18"
   },
   "CPI_INFLATION": {
     "value": 337.476,
@@ -24,19 +24,19 @@
     "date": "2026-10-01"
   },
   "MORTGAGE_30Y": {
-    "value": 7.11,
-    "date": "2026-11-12"
+    "value": 7.28,
+    "date": "2026-11-19"
   },
   "CRUDE_OIL_WTI": {
     "value": 89.53,
     "date": "2026-11-17"
   },
   "FED_ASSETS_TOTAL": {
-    "value": 6758867.0,
-    "date": "2026-11-11"
+    "value": 6741452.0,
+    "date": "2026-11-18"
   },
   "TGA_BALANCE": {
-    "value": 914370.0,
-    "date": "2026-11-11"
+    "value": 916613.0,
+    "date": "2026-11-18"
   }
 }
