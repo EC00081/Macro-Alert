@@ -1,11 +1,11 @@
 {
   "ON_RRP": {
-    "value": 0.301,
-    "date": "2026-11-24"
+    "value": 0.3,
+    "date": "2026-11-25"
   },
   "SOFR": {
-    "value": 3.92,
-    "date": "2026-11-23"
+    "value": 3.94,
+    "date": "2026-11-24"
   },
   "FED_RESERVES": {
     "value": 2979656.0,
@@ -24,12 +24,12 @@
     "date": "2026-10-01"
   },
   "MORTGAGE_30Y": {
-    "value": 7.28,
-    "date": "2026-11-19"
+    "value": 7.21,
+    "date": "2026-11-25"
   },
   "CRUDE_OIL_WTI": {
-    "value": 89.53,
-    "date": "2026-11-17"
+    "value": 82.24,
+    "date": "2026-11-24"
   },
   "FED_ASSETS_TOTAL": {
     "value": 6741452.0,
